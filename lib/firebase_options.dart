@@ -17,17 +17,29 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -40,50 +52,11 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBBRL5uBDFqd99ZPG9pTIDdTOEPKfyoejo',
-    appId: '1:247595491349:ios:27d3ccf2d84964c5142e1c',
-    messagingSenderId: '247595491349',
-    projectId: 'notewave-16d0f',
-    storageBucket: 'notewave-16d0f.firebasestorage.app',
-    iosBundleId: 'com.example.notewave',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBBRL5uBDFqd99ZPG9pTIDdTOEPKfyoejo',
-    appId: '1:247595491349:ios:27d3ccf2d84964c5142e1c',
-    messagingSenderId: '247595491349',
-    projectId: 'notewave-16d0f',
-    storageBucket: 'notewave-16d0f.firebasestorage.app',
-    iosBundleId: 'com.example.notewave',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDylW3-wPAfjP4H-xjfrBOcU5uqsOpYbyQ',
-    appId: '1:247595491349:web:91371963125b441e142e1c',
-    messagingSenderId: '247595491349',
-    projectId: 'notewave-16d0f',
-    authDomain: 'notewave-16d0f.firebaseapp.com',
-    storageBucket: 'notewave-16d0f.firebasestorage.app',
-    measurementId: 'G-VR4HEDQSDM',
-  );
-
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDylW3-wPAfjP4H-xjfrBOcU5uqsOpYbyQ',
-    appId: '1:247595491349:web:91371963125b441e142e1c',
-    messagingSenderId: '247595491349',
-    projectId: 'notewave-16d0f',
-    authDomain: 'notewave-16d0f.firebaseapp.com',
-    storageBucket: 'notewave-16d0f.firebasestorage.app',
-    measurementId: 'G-VR4HEDQSDM',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAe0ysFREWsljOnAg0knudwi-j5AVPZxys',
-    appId: '1:247595491349:android:54e8b7b5a0074080142e1c',
+    appId: '1:247595491349:android:d055dd961a7df0b5142e1c',
     messagingSenderId: '247595491349',
     projectId: 'notewave-16d0f',
     storageBucket: 'notewave-16d0f.firebasestorage.app',
   );
-
 }

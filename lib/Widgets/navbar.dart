@@ -38,6 +38,11 @@ class Navbar extends StatelessWidget {
             activeIcon: Icon(Icons.photo_camera),
             label: selectedIndex == 2 ? 'Photo Notes' : '',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notification_add_outlined),
+            activeIcon: Icon(Icons.notification_add),
+            label: selectedIndex == 3 ? 'Notification' : '',
+          ),
         ],
         currentIndex: selectedIndex,
         selectedItemColor: customBlue,

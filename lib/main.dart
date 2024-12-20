@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:notewave/pages/notespage.dart';
 import 'package:notewave/pages/voicenotespage.dart';
 import 'package:notewave/pages/photonotespage.dart';
-import 'package:notewave/Widgets/navbar.dart';
+import 'package:notewave/pages/notifcation.dart';
+// import 'package:notewave/Widgets/navbar.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
@@ -45,6 +46,7 @@ class _MainPageState extends State<MainPage> {
     NotesPage(),
     VoiceNotesPage(),
     PhotoNotesPage(),
+    NotificationPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -57,10 +59,10 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_selectedIndex],
-      bottomNavigationBar: Navbar(
-        selectedIndex: _selectedIndex,
-        onItemTapped: _onItemTapped,
-      ),
+      // bottomNavigationBar: Navbar(
+      //   selectedIndex: _selectedIndex,
+      //   onItemTapped: _onItemTapped,
+      // ),
     );
   }
 }
