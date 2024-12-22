@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:notewave/services/notes_service.dart';
+import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -17,6 +18,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
   final TextEditingController _titleController = TextEditingController();
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _editorFocusNode = FocusNode();
+  final NotesService _notesService = NotesService();
 
   // List of predefined colors for notes
   final List<Color> _noteColors = [
@@ -30,10 +32,12 @@ class _CreateNotePageState extends State<CreateNotePage> {
   ];
 
   late Color _selectedColor;
+  bool _isKeyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
+    print('CreateNotePage: initState called');
 
     // Generate or load color
     _selectedColor = _getRandomColor();
@@ -64,41 +68,53 @@ class _CreateNotePageState extends State<CreateNotePage> {
 
   Future<void> _saveNote() async {
     try {
+      print('CreateNotePage: Saving note');
       // Get the document as a JSON representation
       final content = jsonEncode(_controller.document.toDelta().toJson());
       final String noteId = widget.existingNoteId ?? _generateNoteId();
+      final timestamp = DateTime.now().toIso8601String();
 
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      print('CreateNotePage: Creating note with ID: $noteId');
 
-      final String? notesJson = prefs.getString("notes");
+      if (widget.existingNoteId != null) {
+        // Update existing note
+        await _notesService.updateNote(
+          id: noteId,
+          title: _titleController.text.isEmpty
+              ? 'Untitled Note'
+              : _titleController.text,
+          content: content,
+          timestamp: timestamp,
+          color: _selectedColor.value,
+        );
+        print('CreateNotePage: Note updated successfully');
+      } else {
+        // Create new note
+        await _notesService.createNote(
+          id: noteId,
+          title: _titleController.text.isEmpty
+              ? 'Untitled Note'
+              : _titleController.text,
+          content: content,
+          timestamp: timestamp,
+          color: _selectedColor.value,
+        );
+        print('CreateNotePage: Note created successfully');
+      }
 
-      Map<String, dynamic> notes = notesJson != null
-          ? Map<String, dynamic>.from(jsonDecode(notesJson))
-          : {};
-
-      final noteData = {
-        'id': noteId,
-        'title': _titleController.text.isEmpty
-            ? 'Untitled Note'
-            : _titleController.text,
-        'content': content, // Store as JSON string
-        'timestamp': DateTime.now().toIso8601String(),
-        'color': _selectedColor.value,
-      };
-
-      notes[noteId] = noteData;
-
-      await prefs.setString("notes", jsonEncode(notes));
-
-      Navigator.of(context).pop(true);
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save note: $e')),
-      );
+      print('CreateNotePage: Error saving note: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save note: $e')),
+        );
+      }
     }
   }
 
-  // Generate a unique note ID
   String _generateNoteId() {
     return DateTime.now().millisecondsSinceEpoch.toString() +
         Random().nextInt(1000).toString();
@@ -106,54 +122,55 @@ class _CreateNotePageState extends State<CreateNotePage> {
 
   Future<void> _loadExistingNote() async {
     try {
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      final String? notesJson = prefs.getString("notes");
+      print(
+          'CreateNotePage: Loading existing note with ID: ${widget.existingNoteId}');
+      final notes = await _notesService.getNotes();
+      final existingNote = notes.firstWhere(
+        (note) => note['id'] == widget.existingNoteId,
+        orElse: () => {},
+      );
 
-      if (notesJson != null) {
-        final Map<String, dynamic> notes =
-            Map<String, dynamic>.from(jsonDecode(notesJson));
+      if (existingNote.isNotEmpty) {
+        print('CreateNotePage: Found existing note: ${existingNote['title']}');
+        // Set title
+        _titleController.text = existingNote['title'] ?? '';
 
-        final existingNote = notes[widget.existingNoteId];
-        if (existingNote != null) {
-          // Set title
-          _titleController.text = existingNote['title'] ?? '';
-
-          // Set note color if exists
-          if (existingNote['color'] != null) {
-            setState(() {
-              _selectedColor = Color(existingNote['color']);
-            });
-          }
-
-          // Set note content from JSON
-          if (existingNote['content'] != null) {
-            final contentJson = jsonDecode(existingNote['content']);
-            setState(() {
-              _controller.document = Document.fromJson(contentJson);
-            });
-
-            // Ensure focus is cleared
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              FocusScope.of(context).unfocus();
-            });
-          }
+        // Set note color if exists
+        if (existingNote['color'] != null) {
+          setState(() {
+            _selectedColor = Color(existingNote['color']);
+          });
         }
+
+        // Set note content from JSON
+        if (existingNote['content'] != null) {
+          final contentJson = jsonDecode(existingNote['content']);
+          setState(() {
+            _controller.document = Document.fromJson(contentJson);
+          });
+
+          // Ensure focus is cleared
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            FocusScope.of(context).unfocus();
+          });
+        }
+      } else {
+        print(
+            'CreateNotePage: No existing note found with ID: ${widget.existingNoteId}');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading note: $e')),
-      );
+      print('CreateNotePage: Error loading note: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading note: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        // Dismiss keyboard when tapping outside
-        _titleFocusNode.unfocus();
-        _editorFocusNode.unfocus();
-      },
+    return KeyboardVisibilityProvider(
       child: Scaffold(
         backgroundColor: _selectedColor,
         appBar: AppBar(
@@ -161,7 +178,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
             icon: Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.black,
               ),
@@ -180,7 +197,7 @@ class _CreateNotePageState extends State<CreateNotePage> {
               icon: Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.black,
                 ),
@@ -216,37 +233,54 @@ class _CreateNotePageState extends State<CreateNotePage> {
               ),
             ),
             Expanded(
-              child: QuillEditor.basic(
-                controller: _controller,
-                focusNode: _editorFocusNode,
-                configurations: QuillEditorConfigurations(
-                  autoFocus: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 30.0, vertical: 20.0),
+                child: QuillEditor.basic(
+                  controller: _controller,
+                  focusNode: _editorFocusNode,
+                  configurations: QuillEditorConfigurations(
+                    placeholder: "Start writing...",
+                    autoFocus: false,
+                  ),
                 ),
               ),
             ),
-            QuillSimpleToolbar(
-              controller: _controller,
-              configurations: const QuillSimpleToolbarConfigurations(
-                showBackgroundColorButton: false,
-                showClearFormat: false,
-                showIndent: false,
-                showSubscript: false,
-                showSuperscript: false,
-                showRedo: false,
-                showUndo: false,
-                showCodeBlock: false,
-                showFontSize: false,
-                showFontFamily: false,
-                showLink: false,
-                showStrikeThrough: false,
-                showInlineCode: false,
-                showListCheck: false,
-                showSearchButton: false,
-                showClipboardCut: false,
-                showClipboardPaste: false,
-                showClipboardCopy: false,
-                toolbarIconAlignment: WrapAlignment.end,
-              ),
+            KeyboardVisibilityBuilder(
+              builder: (context, isKeyboardVisible) {
+                return Column(
+                  children: [
+                    if (isKeyboardVisible)
+                      QuillSimpleToolbar(
+                        controller: _controller,
+                        configurations: const QuillSimpleToolbarConfigurations(
+                          showBackgroundColorButton: false,
+                          showClearFormat: false,
+                          showIndent: false,
+                          showSubscript: false,
+                          showSuperscript: false,
+                          showRedo: false,
+                          showUndo: false,
+                          showCodeBlock: false,
+                          showFontSize: false,
+                          showFontFamily: false,
+                          showLink: false,
+                          showStrikeThrough: false,
+                          showInlineCode: false,
+                          showListCheck: false,
+                          showSearchButton: false,
+                          showClipboardCut: false,
+                          showClipboardPaste: false,
+                          showClipboardCopy: false,
+                          showQuote: false,
+                          toolbarIconAlignment: WrapAlignment.end,
+                          sectionDividerSpace: 0,
+                          toolbarSectionSpacing: 0,
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ],
         ),

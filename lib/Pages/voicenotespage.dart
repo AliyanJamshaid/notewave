@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'dart:math';
 
 class VoiceNotesPage extends StatefulWidget {
-  const VoiceNotesPage({super.key});
+  final Function(String, String, String, int)? onNoteCreated;
+
+  const VoiceNotesPage({super.key, this.onNoteCreated});
 
   @override
   _VoiceNotesPageState createState() => _VoiceNotesPageState();
@@ -15,6 +18,7 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
   String _lastWords = '';
   List<String> _wordHistory = [];
   bool _isRecording = false;
+  bool _showSaveButton = false;
 
   final Color _bluePrimary = const Color(0xFF389ee8);
   final Color _blueSecondary = const Color(0xFF76dcfb);
@@ -31,13 +35,11 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
         onStatus: (status) {
           print('Speech recognition status: $status');
           if (status == 'notListening' && _isRecording) {
-            // Immediate restart if stopped unexpectedly
             _startListening();
           }
         },
         onError: (error) {
           print('Speech recognition error: $error');
-          // Handle potential errors
           setState(() {
             _isRecording = false;
           });
@@ -62,15 +64,16 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
       await _speechToText.listen(
         onResult: _onSpeechResult,
         listenFor: const Duration(minutes: 30),
-        pauseFor: const Duration(seconds: 10), // Reduced pause time
-        partialResults: true, // Capture partial results
+        pauseFor: const Duration(seconds: 10),
+        partialResults: true,
         cancelOnError: false,
         listenMode: ListenMode.confirmation,
       );
-      
+
       setState(() {
         _isRecording = true;
-        _lastWords = ''; // Clear previous words
+        _lastWords = '';
+        _showSaveButton = false;
       });
     } catch (e) {
       print('Start listening error: $e');
@@ -87,18 +90,21 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
         _isRecording = false;
         if (_lastWords.isNotEmpty) {
           _wordHistory.add(_lastWords);
+          _showSaveButton = true;
         }
       });
     } catch (e) {
       print('Stop listening error: $e');
+      // Ensure recording state is reset even if there's an error
+      setState(() {
+        _isRecording = false;
+      });
     }
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
     setState(() {
       _lastWords = result.recognizedWords;
-      
-      // Optionally add partial results
       if (result.finalResult) {
         _wordHistory.add(result.recognizedWords);
       }
@@ -106,20 +112,41 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
   }
 
   void _toggleRecording() {
-    if (!_speechToText.isListening) {
+    if (!_isRecording) {
       _startListening();
     } else {
       _stopListening();
     }
   }
 
+  void _saveNote() {
+    if (_lastWords.isEmpty) return;
+
+    final noteId = 'note_${DateTime.now().millisecondsSinceEpoch}';
+    final random = Random();
+    final color = Color.fromRGBO(
+      random.nextInt(256),
+      random.nextInt(256),
+      random.nextInt(256),
+      1,
+    ).value;
+
+    widget.onNoteCreated?.call(
+      noteId,
+      'Voice Note ${DateTime.now().toString().substring(0, 16)}',
+      _lastWords,
+      color,
+    );
+
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // [Previous build method remains the same]
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Voice Notes',
           style: TextStyle(
             color: Colors.white,
@@ -144,7 +171,8 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -205,18 +233,39 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
                 ),
               ),
               const SizedBox(height: 30),
-              Text(
-                _speechEnabled
-                    ? (_isRecording
-                        ? 'Recording...'
-                        : 'Tap microphone to start')
-                    : 'Speech recognition not available',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: _bluePrimary,
-                  fontWeight: FontWeight.w500,
+              if (_showSaveButton)
+                ElevatedButton(
+                  onPressed: _saveNote,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _bluePrimary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Note',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              ),
+              if (!_showSaveButton)
+                Text(
+                  _speechEnabled
+                      ? (_isRecording
+                          ? 'Recording...'
+                          : 'Tap microphone to start')
+                      : 'Speech recognition not available',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: _bluePrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
             ],
           ),
         ),

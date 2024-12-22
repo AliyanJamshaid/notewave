@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:notewave/pages/notespage.dart';
-import 'package:notewave/pages/voicenotespage.dart';
-import 'package:notewave/pages/photonotespage.dart';
-import 'package:notewave/pages/notifcation.dart';
-// import 'package:notewave/Widgets/navbar.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -15,54 +12,93 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MainPage(),
-    );
-  }
+  State<MyApp> createState() => _MyAppState();
 }
 
-class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+class _MyAppState extends State<MyApp> {
+  bool _isDarkMode = false;
 
   @override
-  State<MainPage> createState() => _MainPageState();
-}
+  void initState() {
+    super.initState();
+    _loadThemeMode();
+  }
 
-class _MainPageState extends State<MainPage> {
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = [
-    NotesPage(),
-    VoiceNotesPage(),
-    PhotoNotesPage(),
-    NotificationPage(),
-  ];
-
-  void _onItemTapped(int index) {
+  Future<void> _loadThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedIndex = index;
+      _isDarkMode = prefs.getBool('dark_mode') ?? false;
+    });
+  }
+
+  void _toggleTheme(bool value) {
+    setState(() {
+      _isDarkMode = value;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages[_selectedIndex],
-      // bottomNavigationBar: Navbar(
-      //   selectedIndex: _selectedIndex,
-      //   onItemTapped: _onItemTapped,
-      // ),
+    return ThemeProvider(
+      isDarkMode: _isDarkMode,
+      toggleTheme: _toggleTheme,
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'NoteWave',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.white,
+          cardColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+          ),
+        ),
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.grey[900],
+          cardColor: Colors.grey[850],
+          appBarTheme: AppBarTheme(
+            backgroundColor: Colors.grey[900],
+            foregroundColor: Colors.white,
+          ),
+        ),
+        themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        home: const NotesPage(),
+      ),
     );
+  }
+}
+
+class ThemeProvider extends InheritedWidget {
+  final bool isDarkMode;
+  final Function(bool) toggleTheme;
+
+  const ThemeProvider({
+    Key? key,
+    required Widget child,
+    required this.isDarkMode,
+    required this.toggleTheme,
+  }) : super(key: key, child: child);
+
+  static ThemeProvider? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ThemeProvider>();
+  }
+
+  @override
+  bool updateShouldNotify(ThemeProvider oldWidget) {
+    return isDarkMode != oldWidget.isDarkMode;
   }
 }

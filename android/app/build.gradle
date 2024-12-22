@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services" // Add this for Google Services
+    id "com.google.gms.google-services"
 }
 
 android {
@@ -46,5 +46,5 @@ dependencies {
     implementation 'com.google.firebase:firebase-analytics' // Firebase Analytics
     implementation 'com.google.firebase:firebase-auth'      // Firebase Authentication
     implementation 'com.google.firebase:firebase-firestore' // Cloud Firestore
-    // Add any other Firebase dependencies here as needed
+
 }
