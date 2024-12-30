@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:notewave/Pages/create_note.dart';
 import 'package:notewave/Widgets/note_item.dart';
 import 'package:notewave/pages/voicenotespage.dart';
-import 'package:notewave/Pages/viewnote.dart';
 import 'package:notewave/pages/settingspage.dart';
 import 'package:notewave/Widgets/FloatingButton.dart';
 import 'package:notewave/services/notes_service.dart';

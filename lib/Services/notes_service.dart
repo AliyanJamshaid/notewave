@@ -314,5 +314,4 @@ class NotesService {
     return mergedNotes.values.toList();
   }
 
-  // Sync notes
 }

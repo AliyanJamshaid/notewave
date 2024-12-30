@@ -1,7 +1,122 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
-import 'package:notewave/Pages/create_note.dart';
 import 'dart:convert';
+import 'package:notewave/pages/create_note.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+import 'package:open_file/open_file.dart';
+
+class NoteActionButtons extends StatelessWidget {
+  final QuillController controller;
+  final VoidCallback onEdit;
+
+  const NoteActionButtons({
+    Key? key,
+    required this.controller,
+    required this.onEdit,
+  }) : super(key: key);
+
+  void _copyNote(BuildContext context) async {
+    final plainText = controller.document.toPlainText();
+    await Clipboard.setData(ClipboardData(text: plainText));
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Note copied to clipboard'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _downloadPdf(BuildContext context) async {
+    try {
+      final pdf = pw.Document();
+      final plainText = controller.document.toPlainText();
+
+      pdf.addPage(
+        pw.Page(
+          build: (context) {
+            return pw.Text(
+              plainText,
+              style: const pw.TextStyle(fontSize: 12),
+            );
+          },
+        ),
+      );
+
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'note_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final file = File('${directory.path}/$fileName');
+
+      await file.writeAsBytes(await pdf.save());
+      await OpenFile.open(file.path);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('PDF downloaded successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating PDF: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(
+            Icons.edit,
+            color: Colors.black, // Changed color to black
+            size: 24,
+          ),
+          onPressed: onEdit,
+          padding: const EdgeInsets.all(5),
+          constraints: const BoxConstraints(),
+        ),
+        const SizedBox(width: 3),
+        IconButton(
+          icon: const Icon(
+            Icons.file_download,
+            color: Colors.black, // Changed color to black
+            size: 24,
+          ),
+          onPressed: () => _downloadPdf(context),
+          padding: const EdgeInsets.all(5),
+          constraints: const BoxConstraints(),
+        ),
+        const SizedBox(width: 3),
+        IconButton(
+          icon: const Icon(
+            Icons.copy,
+            color: Colors.black, // Changed color to black
+            size: 24,
+          ),
+          onPressed: () => _copyNote(context),
+          padding: const EdgeInsets.all(5),
+          constraints: const BoxConstraints(),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+}
 
 class ViewNote extends StatefulWidget {
   final String id;
@@ -24,24 +139,30 @@ class ViewNote extends StatefulWidget {
 }
 
 class _ViewNotePageState extends State<ViewNote> {
-  final QuillController _controller = QuillController.basic();
+  late QuillController _controller;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    // Prevent keyboard from showing automatically
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).unfocus();
     });
 
-    // Set content immediately since we have it
+    // Initialize QuillController
     if (widget.content.isNotEmpty) {
       try {
         final contentJson = jsonDecode(widget.content);
-        _controller.document = Document.fromJson(contentJson);
+        _controller = QuillController(
+          document: Document.fromJson(contentJson),
+          selection: const TextSelection.collapsed(offset: 0),
+        );
       } catch (e) {
         print('Error parsing note content: $e');
+        _controller = QuillController.basic();
       }
+    } else {
+      _controller = QuillController.basic();
     }
   }
 
@@ -55,10 +176,9 @@ class _ViewNotePageState extends State<ViewNote> {
       ),
     );
 
-    // If note was edited and saved (result is true), call refresh callback
     if (result == true && widget.onRefresh != null) {
       widget.onRefresh!();
-      Navigator.pop(context); // Close the view page after successful edit
+      Navigator.pop(context);
     }
   }
 
@@ -68,42 +188,22 @@ class _ViewNotePageState extends State<ViewNote> {
       backgroundColor: widget.backgroundColor,
       appBar: AppBar(
         leading: IconButton(
-          icon: Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black,
-            ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 24,
-            ),
+          icon: const Icon(
+            Icons.chevron_left,
+            color: Colors.black,
+            size: 24,
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
-          // Edit button
-          IconButton(
-            icon: Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black,
-              ),
-              child: const Icon(
-                Icons.edit,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            onPressed: _navigateToEdit,
+          NoteActionButtons(
+            controller: _controller,
+            onEdit: _navigateToEdit,
           ),
         ],
-        backgroundColor: Colors.transparent,
+        backgroundColor: widget.backgroundColor,
         elevation: 0,
+        scrolledUnderElevation: 0,
       ),
       body: Column(
         children: [
@@ -119,21 +219,15 @@ class _ViewNotePageState extends State<ViewNote> {
             ),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 30.0,
-                vertical: 20.0,
-              ),
-              child: QuillEditor.basic(
-                controller: _controller,
-                configurations: QuillEditorConfigurations(
-                  autoFocus: false,
-                  disableClipboard: true,
-                  requestKeyboardFocusOnCheckListChanged: false,
-                  expands: false,
-                  enableInteractiveSelection: false,
-                  checkBoxReadOnly: true,
-                  scrollable: true,
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30.0,
+                  vertical: 20.0,
+                ),
+                child: QuillEditor.basic(
+                  controller: _controller,
                 ),
               ),
             ),
@@ -146,6 +240,7 @@ class _ViewNotePageState extends State<ViewNote> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }

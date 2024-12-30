@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:notewave/services/notes_service.dart';
 import 'dart:math';
 
 class VoiceNotesPage extends StatefulWidget {
-  final Function(String, String, String, int)? onNoteCreated;
-
-  const VoiceNotesPage({super.key, this.onNoteCreated});
+  const VoiceNotesPage({super.key});
 
   @override
   _VoiceNotesPageState createState() => _VoiceNotesPageState();
@@ -14,6 +13,7 @@ class VoiceNotesPage extends StatefulWidget {
 
 class _VoiceNotesPageState extends State<VoiceNotesPage> {
   final SpeechToText _speechToText = SpeechToText();
+  final NotesService _notesService = NotesService();
   bool _speechEnabled = false;
   String _lastWords = '';
   List<String> _wordHistory = [];
@@ -95,7 +95,6 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
       });
     } catch (e) {
       print('Stop listening error: $e');
-      // Ensure recording state is reset even if there's an error
       setState(() {
         _isRecording = false;
       });
@@ -119,10 +118,11 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
     }
   }
 
-  void _saveNote() {
+  Future<void> _saveNote() async {
     if (_lastWords.isEmpty) return;
 
     final noteId = 'note_${DateTime.now().millisecondsSinceEpoch}';
+    final timestamp = DateTime.now().toIso8601String();
     final random = Random();
     final color = Color.fromRGBO(
       random.nextInt(256),
@@ -131,14 +131,34 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
       1,
     ).value;
 
-    widget.onNoteCreated?.call(
-      noteId,
-      'Voice Note ${DateTime.now().toString().substring(0, 16)}',
-      _lastWords,
-      color,
-    );
+    try {
+      await _notesService.createNote(
+        id: noteId,
+        title: 'Voice Note ${DateTime.now().toString().substring(0, 16)}',
+        content: _lastWords,
+        timestamp: timestamp,
+        color: color,
+      );
 
-    Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note saved successfully!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save note: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -233,7 +253,7 @@ class _VoiceNotesPageState extends State<VoiceNotesPage> {
                 ),
               ),
               const SizedBox(height: 30),
-              if (_showSaveButton)
+              if (_showSaveButton && !_isRecording)
                 ElevatedButton(
                   onPressed: _saveNote,
                   style: ElevatedButton.styleFrom(
